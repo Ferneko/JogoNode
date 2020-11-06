@@ -17,7 +17,7 @@ console.log("Server started");
 var SOCKET_LIST = {}
 var Players = {
     list: [],
-    onUpdate : function(){
+    onUpdate: function () {
         var pack = [];
         for (var i in Players.list) {
             var jogador = Players.list[i];
@@ -27,29 +27,31 @@ var Players = {
                 y: jogador.y,
                 nome: jogador.nome,
             })
-    
+
         }
-        return pack; 
+        return pack;
     }
 }
 var Bullets = {
     list: [],
-    onUpdate : function(){
-        if(Math.random() < 0.1){
-            Bullets.list.push(new Bullet(Math.random()*360));
-        }
-
+    onUpdate: function () {
         var pack = [];
         for (var i in Bullets.list) {
             var bullet = Bullets.list[i];
             bullet.update();
-            pack.push({
-                x: bullet.x,
-                y: bullet.y,
-            })
-    
+
+            bullet.onColision(Players.list)
+
+            if (bullet.toRemove)
+                delete Bullets.list[i]
+            else
+                pack.push({
+                    x: bullet.x,
+                    y: bullet.y,
+                })
+
         }
-        return pack; 
+        return pack;
     }
 }
 
@@ -142,7 +144,7 @@ var io = require('socket.io')(serv, {});
 io.sockets.on('connection', function (socket) {
     socket.id = Math.random();
     SOCKET_LIST[socket.id] = socket;
-    //console.log(socket);
+    console.log(socket.id);
     var jogador = new Player(socket.id)
 
     Players.list[socket.id] = jogador;
@@ -150,13 +152,29 @@ io.sockets.on('connection', function (socket) {
 
         if (data.inputId === 'left')
             jogador.setPressingLeft(data.state);
-        if (data.inputId === 'right')
+        else if (data.inputId === 'right')
             jogador.setPressingRight(data.state);
-        if (data.inputId === 'down')
+        else if (data.inputId === 'down')
             jogador.setPressingDown(data.state);
-        if (data.inputId === 'up')
+        else if (data.inputId === 'up')
             jogador.setPressingUp(data.state);
+        else if (data.inputId === 'atack') {
+            jogador.pressingAttack = data.state;
+            Bullets.list.push(new Bullet(jogador.pressingMouseAngle, jogador.x, jogador.y, jogador))
+        }
+        else if (data.inputId === 'mouseAngle')
+            jogador.pressingMouseAngle = data.state;
     });
+
+    socket.on('sendMessageToServer', function (data) {
+        var playerName = socket.id;
+        for (var i in SOCKET_LIST) {
+            var socketItem = SOCKET_LIST[i];
+            socketItem.emit('addToChat', playerName + ": " + data)
+        }
+
+    })
+
 
     socket.on('disconnect', function () {
         delete SOCKET_LIST[socket.id];
@@ -166,13 +184,15 @@ io.sockets.on('connection', function (socket) {
 
 
 
+
+
 })
 
 setInterval(function () {
-   var pack = {
-       players : Players.onUpdate(),
-       bullets : Bullets.onUpdate()
-   }
+    var pack = {
+        players: Players.onUpdate(),
+        bullets: Bullets.onUpdate()
+    }
     for (var i in SOCKET_LIST) {
         var socket = SOCKET_LIST[i];
         socket.emit('newPositions', pack)

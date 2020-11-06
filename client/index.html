@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>teste do servidor node</title>
+    <link href="/client/style.css" rel="stylesheet" />
+</head>
+
+<body>
+    <canvas id="ctx" width="500" height="500" style="border:1px solid"></canvas>
+
+    <div id="chat-text">
+        <div>Hello!</div>
+    </div>
+    <form id="chat-form">
+        <input type="text" id="chat-input" />
+    </form>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.1/socket.io.js"></script>
+    <script>
+        var chatText = document.getElementById('chat-text')
+        var chatForm = document.getElementById('chat-form')
+        var chatInput = document.getElementById('chat-input')
+
+        var ctx = document.getElementById('ctx').getContext("2d");
+        ctx.font = '30px Arial';
+        var socket = io();
+
+        socket.on('newPositions', function (data) {
+            ctx.clearRect(0, 0, 500, 500);
+            for (var i = 0; i < data.players.length; i++) {
+                ctx.fillText(data.players[i].nome, data.players[i].x, data.players[i].y)
+            }
+            for (var i = 0; i < data.bullets.length; i++) {
+                ctx.fillRect(data.bullets[i].x - 5, data.bullets[i].y - 5, 10, 10)
+            }
+        })
+
+        socket.on('addToChat', function (data) {
+            chatText.innerHTML += '<div>' + data + '</div>';
+        });
+
+        chatForm.onsubmit = function (e) {
+            e.preventDefault();
+            socket.emit('sendMessageToServer', chatInput.value);
+            chatInput.value = '';
+        }
+
+        document.onkeydown = function (event) {
+            console.log(event)
+            if (event.keyCode === 68)//d
+                socket.emit('keyPress', { inputId: 'right', state: true })
+            else if (event.keyCode === 83)//s
+                socket.emit('keyPress', { inputId: 'down', state: true })
+            else if (event.keyCode === 65)//a
+                socket.emit('keyPress', { inputId: 'left', state: true })
+            else if (event.keyCode === 87)//w
+                socket.emit('keyPress', { inputId: 'up', state: true })
+        }
+
+        document.onkeyup = function (event) {
+            if (event.keyCode === 68)//d
+                socket.emit('keyPress', { inputId: 'right', state: false })
+            else if (event.keyCode === 83)//s
+                socket.emit('keyPress', { inputId: 'down', state: false })
+            else if (event.keyCode === 65)//a
+                socket.emit('keyPress', { inputId: 'left', state: false })
+            else if (event.keyCode === 87)//w
+                socket.emit('keyPress', { inputId: 'up', state: false })
+        }
+
+        document.onmousedown = function (event) {
+            console.log('front - mouse donw');
+            socket.emit('keyPress', { inputId: 'atack', state: true })
+        }
+
+        document.onmouseup = function (event) {
+            console.log('front - mouse up');
+            socket.emit('keyPress', { inputId: 'atack', state: false })
+        }
+
+        document.onmousemove = function (event) {
+            console.log('front - mouse move');
+            var x = -250 + event.clientX - 8;
+            var y = -250 + event.clientY - 8;
+            var angle = Math.atan2(y,x) / Math.PI * 180;
+            socket.emit('keyPress', { inputId: 'mouseAngle', state: angle })
+        }
+    </script>
+</body>
+
+</html>
